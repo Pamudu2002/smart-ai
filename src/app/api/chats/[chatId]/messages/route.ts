@@ -84,7 +84,7 @@ export async function POST(
         try {
             aiContent = await generateResponse(
                 history,
-                content || "What do you see in this image?",
+                content || "",
                 imageUrl
             );
         } catch {

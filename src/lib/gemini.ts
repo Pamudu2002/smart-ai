@@ -34,6 +34,12 @@ export async function generateResponse(
         currentParts.push({ text: currentPrompt });
     }
 
+    // If there's an image but no prompt, instruct the model to analyze the image
+    // for MCQ questions or answer normally
+    if (imageUrl && !currentPrompt) {
+        currentParts.push({ text: "Analyze this image." });
+    }
+
     // If there's an image URL, fetch it and convert to base64 for the API
     if (imageUrl) {
         try {
@@ -66,7 +72,14 @@ export async function generateResponse(
             contents,
             config: {
                 maxOutputTokens: 8192,
-                temperature: 0.7,
+                temperature: 0.2,
+                systemInstruction: `You are a fast, precise assistant optimized for answering MCQ (multiple choice) questions from images.
+
+RULES:
+1. If the image contains an MCQ question with answer choices (A, B, C, D, etc.), respond with ONLY the correct answer letter (e.g. "B"). Do NOT provide any explanation, reasoning, or additional text. Speed is critical.
+2. If there are multiple MCQ questions in one image, respond with each answer on a new line (e.g. "1. B\n2. A\n3. D").
+3. If the image or text is NOT an MCQ question, respond normally and helpfully.
+4. If the user provides a text prompt along with the image, follow the user's instructions instead of these MCQ rules.`,
             },
         });
 
