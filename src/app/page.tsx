@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import MessageInput from "@/components/MessageInput";
@@ -28,10 +28,40 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   // Default to closed on mobile, open on desktop
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const appRef = useRef<HTMLDivElement>(null);
 
-  // Set initial sidebar state based on screen width (client-side only)
+  // Set initial sidebar state and fix mobile viewport height
   useEffect(() => {
     setSidebarOpen(window.innerWidth >= 768);
+
+    // Fix for mobile browsers where 100vh doesn't match the visible viewport.
+    // Uses visualViewport.height which accurately reflects the area ABOVE the
+    // on-screen keyboard, keeping header and footer always visible.
+    const setAppHeight = () => {
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${vh}px`);
+    };
+
+    // Also reposition when the viewport scrolls (iOS keyboard push)
+    const setAppPosition = () => {
+      if (window.visualViewport) {
+        document.documentElement.style.setProperty(
+          "--app-offset-top",
+          `${window.visualViewport.offsetTop}px`
+        );
+      }
+      setAppHeight();
+    };
+
+    setAppHeight();
+    window.addEventListener("resize", setAppHeight);
+    window.visualViewport?.addEventListener("resize", setAppPosition);
+    window.visualViewport?.addEventListener("scroll", setAppPosition);
+    return () => {
+      window.removeEventListener("resize", setAppHeight);
+      window.visualViewport?.removeEventListener("resize", setAppPosition);
+      window.visualViewport?.removeEventListener("scroll", setAppPosition);
+    };
   }, []);
 
   // Fetch all chats
@@ -206,7 +236,14 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div
+      ref={appRef}
+      className="fixed inset-0 flex overflow-hidden bg-background"
+      style={{
+        height: "var(--app-height, 100dvh)",
+        top: "var(--app-offset-top, 0px)",
+      }}
+    >
       {/* Sidebar */}
       <Sidebar
         chats={chats}
@@ -223,21 +260,29 @@ export default function Home() {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 py-3 border-b border-border shrink-0 bg-surface/50 backdrop-blur-xl">
-          {/* Hamburger — always shown so mobile users can always open sidebar */}
+          {/* Sidebar toggle — always visible for opening/closing the chat list sidebar */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-xl hover:bg-surface-hover text-text-secondary transition-colors shrink-0"
-            aria-label="Toggle sidebar"
+            className={`p-2 rounded-xl transition-all duration-200 shrink-0 ${sidebarOpen
+              ? "hover:bg-surface-hover text-text-secondary"
+              : "bg-accent/15 hover:bg-accent/25 text-accent shadow-sm shadow-accent/10"
+              }`}
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             {sidebarOpen ? (
-              /* X icon when sidebar is open */
+              /* Sidebar close icon — panel with arrow pointing left */
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4h18v16H3V4z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4v16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12l-3-3m3 3l-3 3" />
               </svg>
             ) : (
-              /* Hamburger icon when sidebar is closed */
+              /* Sidebar open icon — panel with arrow pointing right */
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4h18v16H3V4z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4v16" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 12l3-3m-3 3l3 3" />
               </svg>
             )}
           </button>
